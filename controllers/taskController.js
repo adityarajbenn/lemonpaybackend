@@ -1,50 +1,67 @@
+// backend/controllers/taskController.js
+
 const { validationResult } = require("express-validator");
 const Task = require("../models/Task");
 
-// GET all tasks
-exports.getTasks = async (req, res) => {
-  const tasks = await Task.find({ user: req.user }).sort({ createdAt: -1 });
-  res.json(tasks);
-};
-
-// CREATE task
 exports.createTask = async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
-  const { taskName, description, dueDate } = req.body;
+  const { taskName, description, dueDate, userId } = req.body;
 
-  const task = new Task({
-    user: req.user,
-    taskName,
-    description,
-    dueDate,
-  });
-
-  await task.save();
-  res.status(201).json(task);
+  try {
+    const newTask = new Task({ taskName, description, dueDate, user: userId });
+    await newTask.save();
+    res.status(201).json(newTask);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ msg: "Server error" });
+  }
 };
 
-// UPDATE task
+exports.getTasks = async (req, res) => {
+  const { userId } = req.body;
+  try {
+    const tasks = await Task.find({ user: userId }).sort({ createdAt: -1 });
+    res.json(tasks);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ msg: "Server error" });
+  }
+};
+
 exports.updateTask = async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
-  const { taskName, description, dueDate } = req.body;
+  const { taskName, description, dueDate, userId } = req.body;
+  const taskId = req.params.id;
 
-  const updated = await Task.findOneAndUpdate(
-    { _id: req.params.id, user: req.user },
-    { taskName, description, dueDate },
-    { new: true }
-  );
+  try {
+    const task = await Task.findOneAndUpdate(
+      { _id: taskId, user: userId },
+      { taskName, description, dueDate },
+      { new: true }
+    );
 
-  if (!updated) return res.status(404).json({ msg: "Task not found" });
-  res.json(updated);
+    if (!task) return res.status(404).json({ msg: "Task not found" });
+    res.json(task);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ msg: "Server error" });
+  }
 };
 
-// DELETE task
 exports.deleteTask = async (req, res) => {
-  const deleted = await Task.findOneAndDelete({ _id: req.params.id, user: req.user });
-  if (!deleted) return res.status(404).json({ msg: "Task not found" });
-  res.json({ msg: "Task deleted" });
+  const { userId } = req.body;
+  const taskId = req.params.id;
+
+  try {
+    const task = await Task.findOneAndDelete({ _id: taskId, user: userId });
+    if (!task) return res.status(404).json({ msg: "Task not found" });
+    res.json({ msg: "Task deleted" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ msg: "Server error" });
+  }
 };

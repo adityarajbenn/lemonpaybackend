@@ -1,8 +1,8 @@
 const { validationResult } = require("express-validator");
-const bcrypt = require("bcryptjs");
-const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const Task = require("../models/Task");
 
+// User Registration
 exports.registerUser = async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
@@ -13,19 +13,17 @@ exports.registerUser = async (req, res) => {
     let user = await User.findOne({ email });
     if (user) return res.status(400).json({ msg: "User already exists" });
 
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    user = new User({ email, password: hashedPassword });
+    user = new User({ email, password });
     await user.save();
 
-    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
-    res.status(201).json({ token });
+    res.status(201).json({ userId: user._id });
   } catch (err) {
     console.error(err);
     res.status(500).send("Server error");
   }
 };
 
+// User Login
 exports.loginUser = async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
@@ -34,15 +32,79 @@ exports.loginUser = async (req, res) => {
 
   try {
     const user = await User.findOne({ email });
-    if (!user) return res.status(400).json({ msg: "Invalid credentials" });
+    if (!user || user.password !== password) return res.status(400).json({ msg: "Invalid credentials" });
 
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(400).json({ msg: "Invalid credentials" });
-
-    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
-    res.json({ token });
+    res.json({ userId: user._id });
   } catch (err) {
     console.error(err);
-    res.status(500).send("Server error");
+    res.status(500).json({ msg: "Server error" });
+  }
+};
+
+// Create Task
+exports.createTask = async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+  const { taskName, description, dueDate, userId } = req.body;
+
+  try {
+    const newTask = new Task({ taskName, description, dueDate, user: userId });
+    await newTask.save();
+    res.status(201).json(newTask);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ msg: "Server error" });
+  }
+};
+
+// Get Tasks
+exports.getTasks = async (req, res) => {
+  const { userId } = req.body;
+
+  try {
+    const tasks = await Task.find({ user: userId }).sort({ createdAt: -1 });
+    res.json(tasks);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ msg: "Server error" });
+  }
+};
+
+// Update Task
+exports.updateTask = async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+  const { taskName, description, dueDate, userId } = req.body;
+  const taskId = req.params.id;
+
+  try {
+    const task = await Task.findOneAndUpdate(
+      { _id: taskId, user: userId },
+      { taskName, description, dueDate },
+      { new: true }
+    );
+
+    if (!task) return res.status(404).json({ msg: "Task not found" });
+    res.json(task);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ msg: "Server error" });
+  }
+};
+
+// Delete Task
+exports.deleteTask = async (req, res) => {
+  const { userId } = req.body;
+  const taskId = req.params.id;
+
+  try {
+    const task = await Task.findOneAndDelete({ _id: taskId, user: userId });
+    if (!task) return res.status(404).json({ msg: "Task not found" });
+    res.json({ msg: "Task deleted" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ msg: "Server error" });
   }
 };

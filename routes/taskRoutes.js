@@ -5,18 +5,10 @@ const {
   getTasks,
   updateTask,
   deleteTask,
-} = require("../controllers/taskController");
-const auth = require("../middleware/authMiddleware");
+} = require("../controllers/authController");
 
 const router = express.Router();
 
-// All routes below are protected
-router.use(auth);
-
-// GET all tasks for logged-in user
-router.get("/", getTasks);
-
-// POST create task
 router.post(
   "/",
   [
@@ -26,7 +18,8 @@ router.post(
   createTask
 );
 
-// PUT update task
+router.post("/get", getTasks);
+
 router.put(
   "/:id",
   [
@@ -36,7 +29,6 @@ router.put(
   updateTask
 );
 
-// DELETE a task
 router.delete("/:id", deleteTask);
 
 module.exports = router;
